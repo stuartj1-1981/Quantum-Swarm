@@ -1,0 +1,93 @@
+# QSH COP Model: Daikin Altherma 3 8kW
+# Source: Daikin technical data book
+# Test standard: EN 14511
+# Grid: outdoor_temp x flow_temp -> COP
+# 20 data points
+#
+# Used in QSH fleet simulation (fleet.db)
+# See docs/methodology.md Section 3 for interpolation method
+
+model_key: daikin_8
+label: Daikin Altherma 3 8kW
+manufacturer: Daikin
+model_reference: EHBH08D9W / ERGA08DV
+source: Daikin technical data book
+test_standard: EN 14511
+capacity_kw: 8.0
+min_modulation_kw: 2.5
+default_wc_curve: daikin_moderate
+sizing:
+  min_peak_loss_kw: 4.5
+  max_peak_loss_kw: 9.6
+derating_points:
+- outdoor_c: -7
+  capacity_fraction: 0.62
+- outdoor_c: -2
+  capacity_fraction: 0.82
+- outdoor_c: 2
+  capacity_fraction: 0.91
+- outdoor_c: 7
+  capacity_fraction: 1.0
+- outdoor_c: 12
+  capacity_fraction: 1.0
+cop_map:
+- outdoor: -7
+  flow: 25
+  cop: 2.8
+- outdoor: -2
+  flow: 25
+  cop: 3.3
+- outdoor: 2
+  flow: 25
+  cop: 3.8
+- outdoor: 7
+  flow: 25
+  cop: 4.4
+- outdoor: 12
+  flow: 25
+  cop: 4.9
+- outdoor: -7
+  flow: 35
+  cop: 2.4
+- outdoor: -2
+  flow: 35
+  cop: 2.8
+- outdoor: 2
+  flow: 35
+  cop: 3.3
+- outdoor: 7
+  flow: 35
+  cop: 3.8
+- outdoor: 12
+  flow: 35
+  cop: 4.3
+- outdoor: -7
+  flow: 45
+  cop: 2.0
+- outdoor: -2
+  flow: 45
+  cop: 2.3
+- outdoor: 2
+  flow: 45
+  cop: 2.7
+- outdoor: 7
+  flow: 45
+  cop: 3.1
+- outdoor: 12
+  flow: 45
+  cop: 3.6
+- outdoor: -7
+  flow: 55
+  cop: 1.6
+- outdoor: -2
+  flow: 55
+  cop: 1.8
+- outdoor: 2
+  flow: 55
+  cop: 2.2
+- outdoor: 7
+  flow: 55
+  cop: 2.5
+- outdoor: 12
+  flow: 55
+  cop: 2.9
