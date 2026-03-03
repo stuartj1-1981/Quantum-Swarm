@@ -31,15 +31,15 @@ A live QSH installation (2016 build, 5 kW peak loss at −3°C) independently va
 
 | Path | Description |
 |------|-------------|
-| `twin/engine.py` | ThermalEngine — physics stepping model (per-room heat loss, thermal mass, solar gains, emitter output) |
-| `twin/archetypes.py` | UK housing archetype generator (8 types from Victorian terrace to 2020s newbuild) |
-| `twin/batch.py` | Fleet simulation batch runner (parallel execution, SQLite output) |
-| `twin/cop_model.py` | COP bilinear interpolation from manufacturer/EN 14511 data grids |
-| `twin/emitter_model.py` | Radiator/UFH output model (LMTD correction, EN 442 basis) |
-| `twin/wc_curves.py` | 19 manufacturer weather compensation curves (Cosy, Daikin, Ecodan, Grant, Samsung, Vaillant, MCS) |
-| `twin/weather.py` | Climate zone weather data loader |
+| `engine.py` | ThermalEngine — physics stepping model (per-room heat loss, thermal mass, solar gains, emitter output) |
+| `archetypes.py` | UK housing archetype generator (8 types from Victorian terrace to 2020s newbuild) |
+| `batch.py` and `fleet_report.py` | Fleet simulation batch runner (parallel execution, SQLite output) |
+| `cop_model.py` | COP bilinear interpolation from manufacturer/EN 14511 data grids |
+| `emitter_model.py` | Radiator/UFH output model (LMTD correction, EN 442 basis) |
+| `wc_curves.py` | 19 manufacturer weather compensation curves (Cosy, Daikin, Ecodan, Grant, Samsung, Vaillant, MCS) |
+| `weather.py` | Climate zone weather data loader |
 | `fleet.db` | Full fleet simulation results — 34,719 runs, 5.76M hourly rows (SQLite, queryable) |
-| `docs/methodology.md` | Full methodology paper: energy balance, emitter physics, WC analysis, fleet framework |
+| `methodology.md` | Full methodology paper: energy balance, emitter physics, WC analysis, fleet framework |
 
 ## Quick Start
 
