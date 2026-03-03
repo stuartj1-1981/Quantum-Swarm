@@ -1,4 +1,0 @@
-[console_scripts]
-twin-archetypes = twin.archetypes.archetypes:main
-twin-batch = twin.fleet.batch:main
-twin-report = twin.fleet.fleet_report:main
