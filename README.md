@@ -157,9 +157,9 @@ Where n = 1.3 for standard radiators (EN 442). At lower flow temperatures, emitt
 
 This repository is Layer 1 of a three-layer evidence base:
 
-1. **Layer 1** (March 2026): Methodology, fleet simulation framework, WC analysis, baseline results on archetype priors. *You are here.*
-2. **Layer 2** (Jul–Aug 2026): Expanded fleet dataset with additional archetypes, emitter model corrections (n=1.3), and full parameter sensitivity analysis.
-3. **Layer 3** (Sep–Oct 2026): Real-home validation — digital twin predictions vs metered performance at 30-second resolution.
+1. **Layer 1** : Methodology, fleet simulation framework, WC analysis, baseline results on archetype priors. *You are here.*
+2. **Layer 2** : Expanded fleet dataset with additional archetypes, emitter model corrections (n=1.3), and full parameter sensitivity analysis.
+3. **Layer 3** : Real-home validation — digital twin predictions vs metered performance at 30-second resolution.
 
 ## What Is QSH?
 
@@ -167,7 +167,7 @@ QSH is a hybrid deterministic + adaptive thermal optimisation system for residen
 
 - **System identification**: online learning of building thermal parameters (heat loss coefficients, thermal mass, solar gains) from live sensor data
 - **Deterministic control layer**: physics-based energy balance with COP-aware flow temperature selection, safety constraints, and comfort guarantees
-- **Adaptive layer**: reinforcement learning for predictive optimisation, operating within the deterministic safety envelope (the "Skynet Rule")
+- **Adaptive layer**: reinforcement learning for predictive optimisation, operating within the deterministic safety envelope
 
 The deterministic layer alone — no AI, no machine learning, just engineering done properly — outperforms stock controllers by a significant margin.
 
