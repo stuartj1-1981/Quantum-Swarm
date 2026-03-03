@@ -1,0 +1,28 @@
+# QSH Weather Compensation Curve: Samsung EHS Mono — Moderate (Law 3, default)
+# Source: Samsung EHS Mono installer manual, water law settings
+#
+# Piecewise-linear: outdoor_temp -> flow_temp
+# Between breakpoints: linear interpolation
+# Outside range: nearest endpoint (clamped)
+#
+# Used in QSH fleet simulation (fleet.db)
+# See docs/methodology.md Section 4 for details
+
+curve_key: samsung_moderate
+label: Samsung EHS Mono — Moderate (Law 3, default)
+source: Samsung EHS Mono installer manual, water law settings
+min_flow_c: 25.0
+max_flow_c: 51.0
+breakpoints:
+- outdoor_c: -5
+  flow_c: 51.0
+- outdoor_c: 0
+  flow_c: 46.0
+- outdoor_c: 5
+  flow_c: 41.0
+- outdoor_c: 10
+  flow_c: 36.0
+- outdoor_c: 15
+  flow_c: 32.0
+- outdoor_c: 20
+  flow_c: 28.0

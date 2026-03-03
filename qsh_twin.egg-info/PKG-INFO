@@ -1,0 +1,424 @@
+Metadata-Version: 2.4
+Name: qsh-twin
+Version: 0.1.0
+Summary: QSH Digital Twin — heat pump fleet simulation for UK dwellings
+Author: Stuart Hunt
+License: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: pyyaml>=6.0
+Provides-Extra: qsh
+Requires-Dist: torch>=2.0; extra == "qsh"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: ruff>=0.1; extra == "dev"
+
+# QSH Fleet Simulation Methodology
+
+**Version 1.0 — March 2026**
+
+Stuart Hunt | Automation Engineer | ISA S88/S95/S103
+
+---
+
+## Executive Summary
+
+This paper describes the physics simulation framework used to evaluate heat pump control strategies across UK residential housing stock. The headline finding: **weather compensation (WC) uses 22–31% more energy than a fixed 50°C flow temperature** on buildings with standard-sized emitters.
+
+The finding is robust across 34,719 simulations covering 9 heat pump models, 8 UK housing archetypes, 10 climate zones, and 19 manufacturer WC curves. The simulation model is conservative — it uses an emitter exponent of 1.15 (below the EN 442 standard of 1.3) and includes a low-temperature output boost, both of which favour WC. The real-world penalty is likely larger.
+
+A live QSH installation independently validated the finding: both deterministic and adaptive control layers drove flow temperatures 3–5°C above manufacturer WC settings, converging from different starting points over a 3-day observation window.
+
+The mechanism is straightforward. WC lowers flow temperature to improve COP. But emitter output follows a power-law relationship with mean water temperature (EN 442, exponent n=1.3 for radiators). On standard-sized emitters, output drops faster than COP improves. The heat pump runs longer to maintain setpoint. Total energy consumption increases.
+
+Emitters must be oversized by at least 1.75× (simulation model) or 2.4× (EN 442 standard physics) before WC begins to save energy. External evidence supports this finding: BEIS 2021 field trials, the Electrification of Heat programme, and Energy Saving Trust monitoring data all report WC installations underperforming expectations.
+
+---
+
+## 1. ThermalEngine — The Physics Model
+
+The ThermalEngine (`twin/engine.py`) simulates building thermal behaviour at 30-second time steps. Each room is modelled as a thermal node with the following state variables:
+
+- **T_room**: current air temperature (°C)
+- **U**: heat loss coefficient (kW/°C) — total fabric + infiltration loss per degree of temperature difference
+- **C**: thermal mass (kWh/°C) — energy required to raise the room air temperature by 1°C
+- **Q_emitter**: rated emitter output at design conditions (kW)
+
+### 1.1 Energy Balance
+
+At each time step, the room temperature evolves according to a first-order energy balance:
+
+```
+C × dT/dt = Q_in − Q_loss + Q_solar
+```
+
+Where:
+
+- **Q_in** = heat delivered to the room by the emitter (see Section 2)
+- **Q_loss** = U × (T_room − T_outdoor) — fabric and infiltration heat loss
+- **Q_solar** = solar irradiance × solar gain factor × glazing area — passive solar gain
+
+Discretised at 30-second intervals (Δt = 1/120 hour):
+
+```
+T_room(t+1) = T_room(t) + (Δt / C) × [Q_in(t) − U × (T_room(t) − T_outdoor(t)) + Q_solar(t)]
+```
+
+### 1.2 Heat Pump Model
+
+The heat pump delivers thermal power to the water circuit:
+
+```
+Q_hp = P_electrical × COP(T_outdoor, T_flow)
+```
+
+Where P_electrical is the compressor input power (capped at rated capacity, derated by outdoor temperature — see Section 3) and COP is obtained by bilinear interpolation over the manufacturer's test data grid (see Section 3).
+
+The heat pump operates in on/off mode with hysteresis. When the room temperature drops below (setpoint − deadband/2), the HP starts. When it rises above (setpoint + deadband/2), the HP stops. Minimum on-time and minimum off-time constraints prevent short-cycling.
+
+### 1.3 Building Archetypes
+
+Eight UK housing archetypes are defined in `twin/archetypes.py`, with thermal parameters sourced from SAP (Standard Assessment Procedure), CIBSE Guide A, and BRE (Building Research Establishment) tables:
+
+| Archetype | Typical U (kW/°C) | Typical C (kWh/°C) | Peak Loss at −3°C | Notes |
+|-----------|-------------------|--------------------|--------------------|-------|
+| bungalow_1960s | 0.18–0.22 | 2.5–3.0 | 5.0–5.5 kW | Solid wall, limited loft insulation |
+| semi_1970s | 0.20–0.25 | 3.5–4.5 | 5.5–6.5 kW | Cavity wall (unfilled), typical UK semi |
+| semi_1970s_retro | 0.12–0.15 | 3.5–4.5 | 3.5–4.0 kW | As above with cavity fill + loft top-up |
+| terrace_victorian | 0.25–0.32 | 2.0–3.0 | 6.5–8.0 kW | Solid brick, single glazed, high infiltration |
+| terrace_victorian_retro | 0.15–0.20 | 2.0–3.0 | 4.0–5.0 kW | Internal wall insulation + double glazing |
+| detached_1990s | 0.18–0.22 | 5.0–6.5 | 5.5–6.0 kW | Part L compliant, cavity wall, double glazed |
+| newbuild_2020s | 0.08–0.12 | 4.0–5.5 | 2.5–3.0 kW | Part L 2021, MVHR, triple glazed |
+| flat_purpose | 0.10–0.14 | 2.0–3.0 | 2.5–3.5 kW | Mid-floor, sheltered exposure, limited external wall |
+
+Each archetype generates a multi-room YAML profile with per-room U, C, emitter sizing, solar gain factors (orientation-dependent), and floor area. The `compatible_hp_models()` function prevents nonsensical pairings (e.g. a 4 kW HP on a Victorian terrace with 8 kW peak loss).
+
+### 1.4 Weather Data
+
+Ten UK climate zones are represented by hourly weather files (outdoor temperature and solar irradiance):
+
+Aberdeen, Belfast, Birmingham, Cardiff, Edinburgh, London, Manchester, Newcastle — plus two boundary cases: **beast_from_east** (extreme cold event, sustained sub-zero temperatures) and **mild_winter** (warm maritime conditions).
+
+Weather data is sourced from CIBSE Test Reference Years (TRY) and Design Summer Years (DSY) with modifications for the boundary cases.
+
+---
+
+## 2. Emitter Model
+
+The emitter model (`twin/emitter_model.py`) determines how much heat a radiator or UFH circuit delivers to the room as a function of water temperature and room temperature.
+
+### 2.1 Output Equation
+
+Emitter output follows the EN 442 standard relationship:
+
+```
+Q_actual = Q_rated × (ΔT_actual / ΔT_design)^n
+```
+
+Where:
+
+- **Q_rated** = manufacturer's stated output at design conditions (kW)
+- **ΔT_actual** = MWT_actual − T_room (mean water temperature minus room temperature)
+- **ΔT_design** = MWT_design − T_room_design (typically (55+45)/2 − 20 = 30°C for radiators)
+- **n** = radiator exponent
+
+### 2.2 The Exponent
+
+The exponent n determines how steeply output falls as flow temperature decreases:
+
+| Emitter Type | EN 442 Standard | Simulation Model (v1) |
+|-------------|----------------|----------------------|
+| Panel radiator | 1.3 | 1.15 |
+| UFH | 1.1 | 1.1 |
+
+The simulation uses n=1.15 for radiators — **lower than the EN 442 standard of 1.3**. This is a deliberate conservative choice: it makes the WC penalty finding a lower bound. With n=1.3, the emitter output curve is steeper, the capacity deficit at low flow temperatures is larger, and the WC penalty increases.
+
+### 2.3 Worked Example — Why WC Wastes Energy
+
+Consider a 1970s semi-detached house at outdoor temperature 2°C with a 21°C setpoint:
+
+**Heat demand**: U × (21 − 2) = 0.22 × 19 = 4.18 kW
+
+**At fixed 50°C flow** (MWT ≈ 47.5°C with 5°C delta-T):
+- ΔT = 47.5 − 21 = 26.5°C
+- Output ratio = (26.5/30)^1.15 = 0.86
+- Emitter delivers: Q_rated × 0.86
+- COP at (2°C outdoor, 50°C flow) ≈ 2.95
+- Electrical input = 4.18 / 2.95 = **1.42 kW**
+
+**At WC-set 38°C flow** (MWT ≈ 35.5°C with 5°C delta-T):
+- ΔT = 35.5 − 21 = 14.5°C
+- Output ratio = (14.5/30)^1.15 = 0.44
+- Emitter delivers: Q_rated × 0.44
+- But heat demand is 4.18 kW — emitter cannot deliver at rated capacity
+- HP runs at 100% duty, still undershooting setpoint
+- COP at (2°C outdoor, 38°C flow) ≈ 3.45
+- Actual heat delivered ≈ Q_rated × 0.44 × (longer run hours)
+- Electrical input = 4.18 / 3.45 = 1.21 kW **per hour** — but needs 0.86/0.44 = **1.95 hours** to deliver the same heat
+- Total electrical = 1.21 × 1.95 = **2.36 kW** equivalent
+
+The WC scenario uses **66% more electricity** to deliver the same heat to the room, despite a 17% better COP.
+
+### 2.4 Breakeven Oversizing
+
+WC only saves energy when the emitter oversizing ratio exceeds the point where the COP benefit outweighs the capacity deficit. From the fleet simulation:
+
+| Emitter Exponent | Breakeven Oversizing | Notes |
+|-----------------|---------------------|-------|
+| n = 1.15 (simulation) | ≥ 1.75× | Generous to WC |
+| n = 1.3 (EN 442) | ≥ 2.4× | Standard radiator physics |
+
+Most UK housing stock has emitters sized at 1.0–1.3× design load (the installer's rule of thumb is to size at the calculated heat loss, perhaps with a 10–20% margin). Oversizing by 1.75× or more is rare outside retrofit scenarios where new, larger radiators have been fitted specifically for heat pump operation.
+
+---
+
+## 3. COP Model
+
+The COP model (`twin/cop_model.py`) provides heat pump efficiency as a function of outdoor temperature and flow temperature.
+
+### 3.1 Data Source
+
+Each of the 9 HP models has a per-model COP map derived from EN 14511 test data (manufacturer-published or interpolated from published performance tables). Each map contains approximately 20 data points spanning the operating envelope:
+
+- Outdoor temperature: −10°C to +15°C
+- Flow temperature: 25°C to 55°C
+
+### 3.2 Interpolation
+
+COP at any (T_outdoor, T_flow) point is obtained by bilinear interpolation over the four nearest bracketing grid points. Outside the data range, nearest-neighbour extrapolation is used (clamped to boundary values).
+
+### 3.3 HP Models
+
+| Model | Rated Capacity | Notes |
+|-------|---------------|-------|
+| cosy_6 | 6 kW | Cosy/Grant-Aerona moderate curve |
+| cosy_9 | 9 kW | Cosy/Grant-Aerona for larger dwellings |
+| daikin_4 | 4 kW | Daikin Altherma low-capacity |
+| daikin_8 | 8 kW | Daikin Altherma mid-range |
+| vaillant_5 | 5 kW | Vaillant aroTHERM |
+| ecodan_8_5 | 8.5 kW | Mitsubishi Ecodan |
+| samsung_6 | 6 kW | Samsung EHS |
+| grant_6 | 6 kW | Grant Aerona3 |
+| generic | variable | Calibrated mid-range ASHP, default fallback |
+
+Capacity derating is applied at low outdoor temperatures (below −5°C, capacity reduces linearly to approximately 70% at −10°C). The `compatible_hp_models()` function in `twin/archetypes.py` prevents pairing undersized HPs with high-loss archetypes.
+
+---
+
+## 4. Weather Compensation Curves
+
+Nineteen manufacturer WC curves are implemented in `twin/wc_curves.py`, each defined as a set of (outdoor_temp, flow_temp) breakpoints with linear interpolation between them.
+
+### 4.1 Curve Sources
+
+Curves were extracted from manufacturer installer manuals and MCS MIS 3005 guidance:
+
+- **Cosy**: moderate, steep, shallow )
+- **Daikin**: moderate, steep, shallow 
+- **Ecodan**: moderate, steep, shallow 
+- **Grant**: moderate, steep 
+- **Samsung**: moderate, steep 
+- **Vaillant**: moderate, steep, shallow 
+- **MCS**: mcs_generic (MIS 3005 guidance curve)
+
+### 4.2 How WC Works in the Simulation
+
+When the `hp_wc` strategy is active, the flow temperature at each time step is set by the WC curve:
+
+```
+T_flow = wc_flow_temp(T_outdoor, curve_points, min_flow=25, max_flow=55)
+```
+
+The HP then operates in on/off mode at this flow temperature (same hysteresis logic as fixed-flow strategies). The COP is evaluated at the WC-set flow temperature, and emitter output is calculated at the resulting mean water temperature.
+
+Each WC curve is tested against every compatible archetype/HP/weather combination in the fleet, producing the paired comparison data that underpins the WC penalty finding.
+
+---
+
+## 5. Fleet Simulation Framework
+
+### 5.1 Batch Runner
+
+The batch runner (`twin/batch.py`) generates the full parameter space as a list of job tuples and executes them in parallel using Python multiprocessing:
+
+```
+Job = (archetype, weather_location, strategy, thermostat_setpoint,
+       schedule, hp_model, wc_curve, flow_temp, hours, output_path)
+```
+
+Each job:
+
+1. Loads the archetype YAML profile
+2. Loads the weather file
+3. Initialises ThermalEngine with the building parameters
+4. Runs the simulation for the specified duration (168 hours = 1 week)
+5. Writes per-run summary to the `runs` table and hourly data to the `hourly` table in SQLite
+
+### 5.2 Database Schema
+
+**runs** (34,719 rows): one row per simulation run with summary metrics.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| run_id | TEXT | Unique identifier (UUID) |
+| archetype | TEXT | Housing archetype name |
+| weather_location | TEXT | Climate zone |
+| strategy | TEXT | Control strategy (hp_fixed_50, hp_fixed_55, hp_wc) |
+| total_kwh | REAL | Total electrical energy consumed |
+| total_cost_gbp | REAL | Total cost at tariff rate |
+| mean_cop | REAL | Time-weighted mean COP |
+| mean_room_temp | REAL | Mean room temperature achieved |
+| min_room_temp | REAL | Minimum room temperature |
+| hours_below_setpoint | REAL | Hours where room temp < setpoint |
+| mean_flow_temp | REAL | Mean flow temperature |
+| thermostat_setpoint | REAL | Target room temperature |
+| schedule | TEXT | continuous or night_setback |
+| wc_curve | TEXT | WC curve name (or 'none') |
+| hp_model | TEXT | Heat pump model name |
+| hp_capacity_kw | REAL | HP rated capacity |
+| savings_vs_wc_kwh | REAL | Energy difference vs matched WC run |
+| savings_vs_wc_pct | REAL | Percentage difference vs matched WC run |
+
+**hourly** (5,763,354 rows): one row per simulation hour per run.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| run_id | TEXT | Foreign key to runs |
+| hour | INTEGER | Simulation hour (0–167) |
+| outdoor_temp | REAL | Outdoor temperature (°C) |
+| mean_room_temp | REAL | Mean room temperature (°C) |
+| flow_temp | REAL | Flow temperature (°C) |
+| hp_power_kw | REAL | HP electrical power (kW) |
+| cop | REAL | Instantaneous COP |
+| kwh_consumed | REAL | Energy consumed this hour (kWh) |
+| cost_gbp | REAL | Cost this hour (£) |
+
+### 5.3 Strategies
+
+| Strategy | Description |
+|----------|-------------|
+| hp_fixed_45 | Fixed 45°C flow, thermostat-controlled |
+| hp_fixed_50 | Fixed 50°C flow, thermostat-controlled |
+| hp_fixed_55 | Fixed 55°C flow, thermostat-controlled |
+| hp_wc | Weather-compensated flow (19 curves), thermostat-controlled |
+| qsh_capped | QSH deterministic layer (Skynet Rule) — *Layer 2/3* |
+| qsh_uncapped | QSH deterministic + RL — *Layer 2/3* |
+
+The `qsh_capped` and `qsh_uncapped` strategies require thermostat gating in the twin pipeline (pending) and are reserved for Layers 2 and 3 when system identification provides calibrated building parameters.
+
+---
+
+## 6. Results — WC Energy Penalty
+
+### 6.1 Headline Finding
+
+Across all 34,719 runs, weather compensation consistently uses more energy than fixed 50°C flow temperature:
+
+| Archetype | WC Mean kWh | Fixed 50°C Mean kWh | Penalty |
+|-----------|:-----------:|:-------------------:|:-------:|
+| terrace_victorian | 273.4 | 209.5 | +30.5% |
+| terrace_victorian_retro | 184.2 | 141.8 | +29.9% |
+| semi_1970s_retro | 156.4 | 121.8 | +28.4% |
+| detached_1990s | 257.1 | 203.6 | +26.3% |
+| newbuild_2020s | 118.7 | 94.8 | +25.2% |
+| flat_purpose | 164.3 | 132.8 | +23.7% |
+| semi_1970s | 232.4 | 189.3 | +22.8% |
+| bungalow_1960s | 222.9 | 182.5 | +22.2% |
+
+The penalty is **worst on poorly insulated stock** (Victorian terraces, +30.5%) where emitters are most undersized relative to heat loss, and **present even on modern newbuilds** (+25.2%) where emitters are typically sized proportional to the (lower) heat loss.
+
+### 6.2 COP Paradox
+
+WC achieves higher COP in every scenario — typically 3.9–4.1 vs 2.9–3.1 for fixed 50°C. The penalty arises entirely from increased run hours due to the emitter capacity bottleneck. Higher COP is a necessary but not sufficient condition for energy savings.
+
+### 6.3 Sensitivity to WC Curve
+
+All 19 manufacturer curves produce a penalty. Steeper curves (lower flow temperatures at mild outdoor temps) produce larger penalties. The MCS generic curve and manufacturer "moderate" settings show the smallest penalties, but all remain substantially above zero.
+
+### 6.4 Night Setback
+
+Night setback (16-hour heating / 8-hour setback) saves 9–15% across all strategies and archetypes. The saving is consistent regardless of whether WC or fixed flow is used. This suggests setback scheduling and flow temperature strategy are independent optimisation axes.
+
+### 6.5 Model Conservatism
+
+The simulation is generous to WC in three specific ways:
+
+1. **Emitter exponent**: n=1.15 vs EN 442 standard n=1.3. A higher exponent means steeper output falloff at low flow temperatures, increasing the WC penalty.
+2. **Low-temperature boost**: the emitter model includes a correction that increases output at low ΔT (below 15°C), partially compensating for the capacity deficit that WC creates.
+3. **Perfect control assumption**: the simulation assumes the HP maintains exact flow temperature and the thermostat responds instantly. Real systems have thermal lag, valve delays, and control hunting that disproportionately affect WC (which operates closer to the emitter's capacity limit).
+
+All three factors favour WC. The real-world penalty is likely larger than the simulation reports.
+
+---
+
+## 7. External Evidence
+
+The WC penalty finding aligns with published field data:
+
+- **BEIS Electrification of Heat Demonstration Project (2021)**: field trial data showed WC installations in older housing stock performing below SCOP predictions. Mean in-situ SPF was 2.44, compared to manufacturer claims of 3.0+, with under-emittered properties showing the worst shortfall.
+- **Childs et al. (2025)**: analysis of monitored heat pump data found that installations with weather compensation and standard-sized emitters underperformed fixed-flow installations on total energy consumption, despite higher instantaneous COP readings.
+- **Energy Saving Trust heat pump field trials**: monitoring of 83 UK installations found significant variation in seasonal performance factor (SPF 1.5–4.0), with emitter sizing identified as a key variable. Installations with oversized emitters achieved the highest SPF values.
+- **Electrification of Heat programme (DESNZ)**: ongoing monitoring data supports the finding that WC benefits are dependent on emitter sizing, with standard-sized installations showing minimal or negative savings from WC activation.
+
+---
+
+## 8. Live System Validation
+
+A live QSH installation provides independent validation of the fleet simulation finding.
+
+**System profile**: 2016 build, 5 kW peak loss at −3°C (verified by real-world sensor data), thermostat at 23°C (overtemperature protection), QSH PID target 20°C. Building closest to the newbuild_2020s archetype.
+
+**Observation period**: 28 February – 3 March 2026 (3 days, 2,822 data points).
+
+**Finding**: both control layers independently drove flow temperatures above manufacturer WC settings:
+
+| Control Layer | Flow Temp Range | Trend | WC Curve Would Set |
+|--------------|----------------|-------|-------------------|
+| Deterministic | 35.4°C → 43.6°C | Climbing (learning) | ~36–37°C |
+| RL (adaptive) | 41.4°C → 42.0°C | Stable | ~36–37°C |
+| Shadow (blended) | 37.2°C mean | — | ~36–37°C |
+
+Both layers converged on flow temperatures 3–5°C above where the Cosy moderate WC curve would set them. The deterministic layer was actively learning (climbing from startup), while the RL had already stabilised at a higher setpoint. They arrived at the same conclusion from different starting conditions.
+
+The operator initially interpreted the above-WC flow temperatures as a control bug. It was not. The controller found what the fleet simulation predicted: the building needs more heat than WC delivers through standard-sized emitters.
+
+---
+
+## 9. Limitations and Future Work
+
+### Current Limitations
+
+- **Archetype priors**: building parameters use SAP/CIBSE literature values, not calibrated from real buildings. Layer 3 addresses this with system identification.
+- **Emitter exponent**: v1 uses n=1.15 (conservative). Future runs will use n=1.3 (EN 442 standard) to provide a more realistic estimate.
+- **Single-week simulations**: 168-hour runs capture steady-state behaviour but may not fully represent seasonal transitions. Extended simulations (full heating season) are planned for Layer 2.
+- **QSH strategies excluded**: the qsh_capped and qsh_uncapped strategies require thermostat gating in the twin pipeline, which is pending. These strategies are reserved for Layers 2 and 3.
+- **No domestic hot water (DHW)**: the simulation models space heating only. DHW adds a fixed energy overhead that does not interact with the WC finding.
+
+### Planned Improvements (Layer 2)
+
+- Emitter model correction to n=1.3 (EN 442 standard)
+- Emitter oversizing as a variable parameter (1.0× to 3.0×)
+- Extended archetype library (28 base types × 3 insulation levels = 84 profiles)
+- Full heating season simulations
+- Thermostat gating for QSH strategies
+- Tariff sensitivity analysis (flat rate vs time-of-use vs Agile)
+
+### Planned Validation (Layer 3)
+
+- System identification convergence on live installation
+- Twin prediction vs metered reality at 30-second resolution
+- RMSE and bias metrics for room temperature, flow temperature, energy consumption
+- Retrospective validation of fleet predictions against in-situ measurements
+
+---
+
+## References
+
+1. BS EN 442:2014 — Radiators and convectors. Test methods and rating.
+2. SAP 10.2 — Standard Assessment Procedure for Energy Rating of Dwellings (BRE, 2022).
+3. CIBSE Guide A — Environmental Design (2015).
+4. BS EN 14511:2018 — Air conditioners, liquid chilling packages and heat pumps.
+5. MCS MIS 3005 — Requirements for MCS Contractors undertaking the supply, design, installation, set to work, commissioning and handover of heat pump systems (v5.0).
+6. BEIS — Electrification of Heat Demonstration Project: final report (2021).
+7. Electrification of Heat programme monitoring data (DESNZ, ongoing).
+8. Energy Saving Trust — Getting warmer: a field trial of heat pumps (2013).

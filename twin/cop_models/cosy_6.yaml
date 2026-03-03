@@ -1,0 +1,93 @@
+# QSH COP Model: Octopus Cosy 6kW
+# Source: MCS certificate + field data calibration
+# Test standard: EN 14511
+# Grid: outdoor_temp x flow_temp -> COP
+# 20 data points
+#
+# Used in QSH fleet simulation (fleet.db)
+# See docs/methodology.md Section 3 for interpolation method
+
+model_key: cosy_6
+label: Octopus Cosy 6kW
+manufacturer: Octopus Energy (Midea OEM)
+model_reference: Cosy 6
+source: MCS certificate + field data calibration
+test_standard: EN 14511
+capacity_kw: 6.0
+min_modulation_kw: 2.0
+default_wc_curve: cosy_moderate
+sizing:
+  min_peak_loss_kw: 3.0
+  max_peak_loss_kw: 7.2
+derating_points:
+- outdoor_c: -7
+  capacity_fraction: 0.65
+- outdoor_c: -2
+  capacity_fraction: 0.85
+- outdoor_c: 2
+  capacity_fraction: 0.92
+- outdoor_c: 7
+  capacity_fraction: 1.0
+- outdoor_c: 12
+  capacity_fraction: 1.0
+cop_map:
+- outdoor: -7
+  flow: 25
+  cop: 2.9
+- outdoor: -2
+  flow: 25
+  cop: 3.4
+- outdoor: 2
+  flow: 25
+  cop: 3.9
+- outdoor: 7
+  flow: 25
+  cop: 4.5
+- outdoor: 12
+  flow: 25
+  cop: 5.0
+- outdoor: -7
+  flow: 35
+  cop: 2.5
+- outdoor: -2
+  flow: 35
+  cop: 2.9
+- outdoor: 2
+  flow: 35
+  cop: 3.4
+- outdoor: 7
+  flow: 35
+  cop: 3.9
+- outdoor: 12
+  flow: 35
+  cop: 4.5
+- outdoor: -7
+  flow: 45
+  cop: 2.0
+- outdoor: -2
+  flow: 45
+  cop: 2.4
+- outdoor: 2
+  flow: 45
+  cop: 2.8
+- outdoor: 7
+  flow: 45
+  cop: 3.2
+- outdoor: 12
+  flow: 45
+  cop: 3.7
+- outdoor: -7
+  flow: 55
+  cop: 1.6
+- outdoor: -2
+  flow: 55
+  cop: 1.9
+- outdoor: 2
+  flow: 55
+  cop: 2.3
+- outdoor: 7
+  flow: 55
+  cop: 2.6
+- outdoor: 12
+  flow: 55
+  cop: 3.0

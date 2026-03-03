@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qsh-twin"
+version = "0.1.0"
+description = "QSH Digital Twin — heat pump fleet simulation for UK dwellings"
+readme = "docs/methodology.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Stuart Hunt"},
+]
+
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Full QSH pipeline (RL strategies, drivers, etc.)
+qsh = [
+    "torch>=2.0",
+]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.1",
+]
+
+[project.scripts]
+twin-batch = "twin.fleet.batch:main"
+twin-report = "twin.fleet.fleet_report:main"
+twin-archetypes = "twin.archetypes.archetypes:main"
+
+[tool.setuptools.packages.find]
+include = ["twin*"]
+
+[tool.setuptools.package-data]
+"twin.archetypes" = ["*.yaml"]
+"twin.cop_models" = ["*.yaml"]
+"twin.wc_curves" = ["*.yaml"]
+"twin.weather" = ["*.csv"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120

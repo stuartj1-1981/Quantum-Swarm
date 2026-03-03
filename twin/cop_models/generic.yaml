@@ -1,0 +1,105 @@
+# QSH COP Model: Generic Mid-Range ASHP
+# Source: Calibrated to live system data (outdoor=5, flow=33) ~ COP 3.9
+# Test standard: EN 14511 (interpolated)
+# Grid: outdoor_temp x flow_temp -> COP
+# 24 data points
+#
+# Used in QSH fleet simulation (fleet.db)
+# See docs/methodology.md Section 3 for interpolation method
+
+model_key: generic
+label: Generic Mid-Range ASHP
+manufacturer: Generic
+model_reference: Calibrated mid-range UK ASHP
+source: Calibrated to live system data (outdoor=5, flow=33) ~ COP 3.9
+test_standard: EN 14511 (interpolated)
+capacity_kw: 6.0
+min_modulation_kw: 2.0
+default_wc_curve: mcs_generic
+sizing:
+  min_peak_loss_kw: 2.0
+  max_peak_loss_kw: 7.2
+derating_points:
+- outdoor_c: -7
+  capacity_fraction: 0.65
+- outdoor_c: -2
+  capacity_fraction: 0.85
+- outdoor_c: 2
+  capacity_fraction: 0.92
+- outdoor_c: 7
+  capacity_fraction: 1.0
+- outdoor_c: 12
+  capacity_fraction: 1.0
+cop_map:
+- outdoor: -10
+  flow: 25
+  cop: 2.5
+- outdoor: -10
+  flow: 35
+  cop: 2.1
+- outdoor: -10
+  flow: 45
+  cop: 1.8
+- outdoor: -10
+  flow: 55
+  cop: 1.5
+- outdoor: -5
+  flow: 25
+  cop: 3.2
+- outdoor: 0
+  flow: 25
+  cop: 3.7
+- outdoor: 5
+  flow: 25
+  cop: 4.3
+- outdoor: 10
+  flow: 25
+  cop: 4.8
+- outdoor: 15
+  flow: 25
+  cop: 5.2
+- outdoor: -5
+  flow: 35
+  cop: 2.8
+- outdoor: 0
+  flow: 35
+  cop: 3.2
+- outdoor: 5
+  flow: 35
+  cop: 3.8
+- outdoor: 10
+  flow: 35
+  cop: 4.3
+- outdoor: 15
+  flow: 35
+  cop: 4.8
+- outdoor: -5
+  flow: 45
+  cop: 2.3
+- outdoor: 0
+  flow: 45
+  cop: 2.7
+- outdoor: 5
+  flow: 45
+  cop: 3.2
+- outdoor: 10
+  flow: 45
+  cop: 3.7
+- outdoor: 15
+  flow: 45
+  cop: 4.1
+- outdoor: -5
+  flow: 55
+  cop: 1.8
+- outdoor: 0
+  flow: 55
+  cop: 2.1
+- outdoor: 5
+  flow: 55
+  cop: 2.5
+- outdoor: 10
+  flow: 55
+  cop: 2.9
+- outdoor: 15
+  flow: 55
+  cop: 3.2
