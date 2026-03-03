@@ -1,0 +1,22 @@
+# Large simulation results — download from GitHub Releases
+results/fleet.db
+results/fleet.db.zip
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Editable install
+*.egg-link
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
