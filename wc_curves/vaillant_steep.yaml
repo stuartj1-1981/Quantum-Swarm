@@ -1,0 +1,28 @@
+# QSH Weather Compensation Curve: Vaillant Arotherm+ — Steep (Curve 0.4)
+# Source: Vaillant Arotherm+ engineering manual, heating curve gradient
+#
+# Piecewise-linear: outdoor_temp -> flow_temp
+# Between breakpoints: linear interpolation
+# Outside range: nearest endpoint (clamped)
+#
+# Used in QSH fleet simulation (fleet.db)
+# See docs/methodology.md Section 4 for details
+
+curve_key: vaillant_steep
+label: Vaillant Arotherm+ — Steep (Curve 0.4)
+source: Vaillant Arotherm+ engineering manual, heating curve gradient
+min_flow_c: 25.0
+max_flow_c: 47.0
+breakpoints:
+- outdoor_c: -5
+  flow_c: 47.0
+- outdoor_c: 0
+  flow_c: 42.0
+- outdoor_c: 5
+  flow_c: 36.0
+- outdoor_c: 10
+  flow_c: 31.0
+- outdoor_c: 15
+  flow_c: 27.0
+- outdoor_c: 20
+  flow_c: 25.0

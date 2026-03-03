@@ -1,0 +1,28 @@
+# QSH Weather Compensation Curve: Octopus Cosy — Flat (Curve 5)
+# Source: Octopus Energy installer manual, Cosy 6/9 WC settings
+#
+# Piecewise-linear: outdoor_temp -> flow_temp
+# Between breakpoints: linear interpolation
+# Outside range: nearest endpoint (clamped)
+#
+# Used in QSH fleet simulation (fleet.db)
+# See docs/methodology.md Section 4 for details
+
+curve_key: cosy_flat
+label: Octopus Cosy — Flat (Curve 5)
+source: Octopus Energy installer manual, Cosy 6/9 WC settings
+min_flow_c: 30.0
+max_flow_c: 55.0
+breakpoints:
+- outdoor_c: -5
+  flow_c: 55.0
+- outdoor_c: 0
+  flow_c: 50.0
+- outdoor_c: 5
+  flow_c: 47.0
+- outdoor_c: 10
+  flow_c: 43.0
+- outdoor_c: 15
+  flow_c: 40.0
+- outdoor_c: 20
+  flow_c: 37.0
