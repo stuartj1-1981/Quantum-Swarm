@@ -31,15 +31,15 @@ A live QSH installation (2016 build, 5 kW peak loss at −3°C) independently va
 
 | Path | Description |
 |------|-------------|
-| `engine.py` | ThermalEngine — physics stepping model (per-room heat loss, thermal mass, solar gains, emitter output) |
-| `archetypes.py` | UK housing archetype generator (8 types from Victorian terrace to 2020s newbuild) |
-| `batch.py` and `fleet_report.py` | Fleet simulation batch runner (parallel execution, SQLite output) |
-| `cop_model.py` | COP bilinear interpolation from manufacturer/EN 14511 data grids |
-| `emitter_model.py` | Radiator/UFH output model (LMTD correction, EN 442 basis) |
-| `wc_curves.py` | 19 manufacturer weather compensation curves (Cosy, Daikin, Ecodan, Grant, Samsung, Vaillant, MCS) |
-| `weather.py` | Climate zone weather data loader |
-| `fleet.db` | Full fleet simulation results — 34,719 runs, 5.76M hourly rows (SQLite, queryable) |
-| `methodology.md` | Full methodology paper: energy balance, emitter physics, WC analysis, fleet framework |
+| `twin/engine/engine.py` | ThermalEngine — physics stepping model (per-room heat loss, thermal mass, solar gains, emitter output) |
+| `twin/engine/emitter_model.py` | Radiator/UFH output model (LMTD correction, EN 442 basis) |
+| `twin/archetypes/archetypes.py` | UK housing archetype generator (8 types from Victorian terrace to 2020s newbuild) |
+| `twin/fleet/batch.py` | Fleet simulation batch runner (parallel execution, SQLite output) |
+| `twin/fleet/fleet_report.py` | Report generation from fleet results database |
+| `twin/cop_models/cop_model.py` | COP bilinear interpolation from manufacturer/EN 14511 data grids |
+| `twin/wc_curves/wc_curves.py` | 19 manufacturer weather compensation curves (Cosy, Daikin, Ecodan, Grant, Samsung, Vaillant, MCS) |
+| `twin/weather/weather.py` | Climate zone weather data loader |
+| `docs/methodology.md` | Full methodology paper: energy balance, emitter physics, WC analysis, fleet framework |
 
 ## Quick Start
 
@@ -93,7 +93,7 @@ sqlite3 fleet.db "
   FROM hourly
   WHERE run_id = (SELECT run_id FROM runs WHERE archetype='semi_1970s'
                   AND weather_location='london' AND strategy='hp_fixed_50'
-                  AND hp_model='cosy_6' LIMIT 1)
+                  LIMIT 1)
   ORDER BY hour LIMIT 24;
 "
 ```
@@ -163,7 +163,7 @@ This repository is Layer 1 of a three-layer evidence base:
 
 ## What Is QSH?
 
-QSH is a hybrid deterministic + adaptive thermal optimisation system for residential heat pumps, currenlty running as a Home Assistant add-on but is system agnostic. It combines:
+QSH is a hybrid deterministic + adaptive thermal optimisation system for residential heat pumps, currently running as a Home Assistant add-on but is system agnostic. It combines:
 
 - **System identification**: online learning of building thermal parameters (heat loss coefficients, thermal mass, solar gains) from live sensor data
 - **Deterministic control layer**: physics-based energy balance with COP-aware flow temperature selection, safety constraints, and comfort guarantees

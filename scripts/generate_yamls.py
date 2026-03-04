@@ -11,9 +11,11 @@ Usage:
 import os
 import yaml
 
-# ── Output directories ──
-COP_DIR = "/sessions/serene-lucid-fermat/mnt/qsh/cop_models"
-WC_DIR = "/sessions/serene-lucid-fermat/mnt/qsh/wc_curves"
+# ── Output directories (relative to repo root) ──
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.dirname(_SCRIPT_DIR)
+COP_DIR = os.path.join(_REPO_ROOT, "twin", "cop_models")
+WC_DIR = os.path.join(_REPO_ROOT, "twin", "wc_curves")
 
 os.makedirs(COP_DIR, exist_ok=True)
 os.makedirs(WC_DIR, exist_ok=True)

@@ -173,7 +173,7 @@ class ThermalEngine:
 
         # Emitter model config
         emitter_cfg = twin_cfg.get("emitters", {})
-        self._emitter_exponent = emitter_cfg.get("exponent", 1.3)
+        self._emitter_exponent = emitter_cfg.get("exponent", 1.15)
         self._design_flow_temp = emitter_cfg.get("design_flow_temp", 55.0)
         self._design_return_temp = emitter_cfg.get("design_return_temp", 45.0)
 
@@ -234,11 +234,10 @@ class ThermalEngine:
                 defrost_derating = max(0.85, 1.0 - 0.10 * (7.0 - outdoor_temp) / 12.0)
             hp_capacity *= defrost_derating
 
-            self.state.heat_delivered_kw = hp_capacity
-            self.state.hp_power_kw = hp_capacity / max(cop, 1.0)
+            # hp_capacity and cop are set; actual delivery determined after
+            # emitter demand is known (see below).
         else:
-            self.state.heat_delivered_kw = 0.0
-            self.state.hp_power_kw = 0.0
+            hp_capacity = 0.0
             cop = 0.0
 
         # Distribute heat to rooms using emitter model
@@ -266,9 +265,20 @@ class ThermalEngine:
             per_room_q[room_name] = q_emitter
             total_emitter_demand += q_emitter
 
+        # HP can't deliver more than emitters can reject (energy conservation).
+        # This was previously set to hp_capacity unconditionally, which created
+        # phantom energy when total_emitter_demand < hp_capacity.
+        if self.state.hp_on:
+            actual_delivery = min(hp_capacity, total_emitter_demand)
+            self.state.heat_delivered_kw = actual_delivery
+            self.state.hp_power_kw = actual_delivery / max(cop, 1.0)
+        else:
+            self.state.heat_delivered_kw = 0.0
+            self.state.hp_power_kw = 0.0
+
         # Scale emitter demands so total doesn't exceed HP capacity
         if total_emitter_demand > 0 and self.state.hp_on:
-            scale = min(1.0, self.state.heat_delivered_kw / total_emitter_demand)
+            scale = min(1.0, hp_capacity / total_emitter_demand)
         else:
             scale = 0.0
 

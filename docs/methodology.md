@@ -22,7 +22,7 @@ Emitters must be oversized by at least 1.75× (simulation model) or 2.4× (EN 44
 
 ## 1. ThermalEngine — The Physics Model
 
-The ThermalEngine (`twin/engine.py`) simulates building thermal behaviour at 30-second time steps. Each room is modelled as a thermal node with the following state variables:
+The ThermalEngine (`twin/engine/engine.py`) simulates building thermal behaviour at 30-second time steps. Each room is modelled as a thermal node with the following state variables:
 
 - **T_room**: current air temperature (°C)
 - **U**: heat loss coefficient (kW/°C) — total fabric + infiltration loss per degree of temperature difference
@@ -63,7 +63,7 @@ The heat pump operates in on/off mode with hysteresis. When the room temperature
 
 ### 1.3 Building Archetypes
 
-Eight UK housing archetypes are defined in `twin/archetypes.py`, with thermal parameters sourced from SAP (Standard Assessment Procedure), CIBSE Guide A, and BRE (Building Research Establishment) tables:
+Eight UK housing archetypes are defined in `twin/archetypes/archetypes.py`, with thermal parameters sourced from SAP (Standard Assessment Procedure), CIBSE Guide A, and BRE (Building Research Establishment) tables:
 
 | Archetype | Typical U (kW/°C) | Typical C (kWh/°C) | Peak Loss at −3°C | Notes |
 |-----------|-------------------|--------------------|--------------------|-------|
@@ -90,7 +90,7 @@ Weather data is sourced from CIBSE Test Reference Years (TRY) and Design Summer 
 
 ## 2. Emitter Model
 
-The emitter model (`twin/emitter_model.py`) determines how much heat a radiator or UFH circuit delivers to the room as a function of water temperature and room temperature.
+The emitter model (`twin/engine/emitter_model.py`) determines how much heat a radiator or UFH circuit delivers to the room as a function of water temperature and room temperature.
 
 ### 2.1 Output Equation
 
@@ -159,7 +159,7 @@ Most UK housing stock has emitters sized at 1.0–1.3× design load (the install
 
 ## 3. COP Model
 
-The COP model (`twin/cop_model.py`) provides heat pump efficiency as a function of outdoor temperature and flow temperature.
+The COP model (`twin/cop_models/cop_model.py`) provides heat pump efficiency as a function of outdoor temperature and flow temperature.
 
 ### 3.1 Data Source
 
@@ -186,13 +186,13 @@ COP at any (T_outdoor, T_flow) point is obtained by bilinear interpolation over 
 | grant_6 | 6 kW | Grant Aerona3 |
 | generic | variable | Calibrated mid-range ASHP, default fallback |
 
-Capacity derating is applied at low outdoor temperatures (below −5°C, capacity reduces linearly to approximately 70% at −10°C). The `compatible_hp_models()` function in `twin/archetypes.py` prevents pairing undersized HPs with high-loss archetypes.
+Capacity derating is applied at low outdoor temperatures (below −5°C, capacity reduces linearly to approximately 70% at −10°C). The `compatible_hp_models()` function in `twin/archetypes/archetypes.py` prevents pairing undersized HPs with high-loss archetypes.
 
 ---
 
 ## 4. Weather Compensation Curves
 
-Nineteen manufacturer WC curves are implemented in `twin/wc_curves.py`, each defined as a set of (outdoor_temp, flow_temp) breakpoints with linear interpolation between them.
+Nineteen manufacturer WC curves are implemented in `twin/wc_curves/wc_curves.py`, each defined as a set of (outdoor_temp, flow_temp) breakpoints with linear interpolation between them.
 
 ### 4.1 Curve Sources
 
@@ -224,7 +224,7 @@ Each WC curve is tested against every compatible archetype/HP/weather combinatio
 
 ### 5.1 Batch Runner
 
-The batch runner (`twin/batch.py`) generates the full parameter space as a list of job tuples and executes them in parallel using Python multiprocessing:
+The batch runner (`twin/fleet/batch.py`) generates the full parameter space as a list of job tuples and executes them in parallel using Python multiprocessing:
 
 ```
 Job = (archetype, weather_location, strategy, thermostat_setpoint,
@@ -259,8 +259,8 @@ Each job:
 | thermostat_setpoint | REAL | Target room temperature |
 | schedule | TEXT | continuous or night_setback |
 | wc_curve | TEXT | WC curve name (or 'none') |
-| hp_model | TEXT | Heat pump model name |
-| hp_capacity_kw | REAL | HP rated capacity |
+| savings_kwh | REAL | Energy savings vs best HP fixed-flow baseline |
+| savings_pct | REAL | Percentage savings vs best HP fixed-flow baseline |
 | savings_vs_wc_kwh | REAL | Energy difference vs matched WC run |
 | savings_vs_wc_pct | REAL | Percentage difference vs matched WC run |
 

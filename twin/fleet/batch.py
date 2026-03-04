@@ -383,7 +383,16 @@ def run_single_sim(args: Tuple) -> Dict[str, Any]:
     start_time = time.time()
 
     try:
-        from qsh.drivers import create_driver  # external: requires full QSH install
+        try:
+            from qsh.drivers import create_driver  # external: requires full QSH install
+        except ImportError:
+            raise ImportError(
+                f"Strategy '{strategy}' requires the full QSH package "
+                f"(qsh.drivers). The public twin repo only supports stock "
+                f"HP strategies (hp_fixed_*, hp_wc, stock, stock_weather_comp). "
+                f"QSH strategies (qsh_capped, qsh_uncapped) require the "
+                f"private QSH installation."
+            )
 
         # Apply strategy
         cfg = apply_strategy(config, strategy, **strategy_kwargs)
