@@ -120,7 +120,7 @@ Python 3.10+ and SQLite3. No GPU required — fleet simulations run on CPU.
 
 ```bash
 # Clone the repository
-git clone https://github.com/[your-org]/qsh.git
+git clone https://github.com/stuartj1-1981/Quantum-Swarm.git
 cd qsh
 
 # Install dependencies
