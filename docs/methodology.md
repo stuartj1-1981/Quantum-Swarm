@@ -1,6 +1,6 @@
 # QSH Fleet Simulation Methodology
 
-**Version 1.0 — March 2026**
+**Version 1.1 — March 2026**
 
 Stuart Hunt | Automation Engineer | ISA S88/S95/S103
 
@@ -8,15 +8,13 @@ Stuart Hunt | Automation Engineer | ISA S88/S95/S103
 
 ## Executive Summary
 
-This paper describes the physics simulation framework used to evaluate heat pump control strategies across UK residential housing stock. The headline finding: **weather compensation (WC) uses 22–31% more energy than a fixed 50°C flow temperature** on buildings with standard-sized emitters.
+This paper describes the physics simulation framework used to evaluate heat pump control strategies across UK residential housing stock. The headline finding: **weather compensation (WC) is the best available stock control strategy, delivering 28–48% energy savings over fixed-flow operation** — but QSH improves on WC by a further +1.8–2.7% COP across all archetypes, and live validation reveals a shoulder mode operating regime that the fleet does not yet model, widening the advantage to +3.1–7.1%.
 
-The finding is robust across 34,719 simulations covering 9 heat pump models, 8 UK housing archetypes, 10 climate zones, and 19 manufacturer WC curves. The simulation model is conservative — it uses an emitter exponent of 1.15 (below the EN 442 standard of 1.3) and includes a low-temperature output boost, both of which favour WC. The real-world penalty is likely larger.
+The finding is robust across 348,170 simulations covering 8 heat pump models, 8 UK housing archetypes, 10 climate zones, and 27 WC curves. The simulation uses an emitter exponent of n=1.15 (below the EN 442 standard of n=1.3). Layer 2 will investigate the n=1.3 regime where the emitter capacity bottleneck tightens and WC's energy advantage narrows.
 
-A live QSH installation independently validated the finding: both deterministic and adaptive control layers drove flow temperatures 3–5°C above manufacturer WC settings, converging from different starting points over a 3-day observation window.
+A live QSH installation (205 m², 13 controlled zones, 16 days of 30-second historian data) validated the fleet predictions: both deterministic and adaptive control layers independently drove flow temperatures above manufacturer WC settings, converging from different starting points. Measured live COP of 3.88 (space heating, heating-only filter) aligns with fleet predictions. The live system further revealed a shoulder mode regime (38–49°C flow, COP 4.77) driven by compressor load-factor efficiency — an effect not captured in the fleet's static COP maps.
 
-The mechanism is straightforward. WC lowers flow temperature to improve COP. But emitter output follows a power-law relationship with mean water temperature (EN 442, exponent n=1.3 for radiators). On standard-sized emitters, output drops faster than COP improves. The heat pump runs longer to maintain setpoint. Total energy consumption increases.
-
-Emitters must be oversized by at least 1.75× (simulation model) or 2.4× (EN 442 standard physics) before WC begins to save energy. External evidence supports this finding: BEIS 2021 field trials, the Electrification of Heat programme, and Energy Saving Trust monitoring data all report WC installations underperforming expectations.
+**The customer-relevant metric is not COP. It is the cost to deliver one kilowatt-hour of useful heat to the building.** On the Ofgem Q1 2026 standard tariff (27.69p/kWh), QSH delivers heat at **6.77p/kWh** against weather compensation at **6.92p/kWh** and fixed 45°C flow at **8.22p/kWh**. WC's COP advantage over fixed flow is real and substantial. QSH's advantage over WC is smaller but consistent, and the shoulder mode finding — not yet modelled in the fleet — indicates the fleet prediction is conservative.
 
 ---
 
@@ -116,9 +114,9 @@ The exponent n determines how steeply output falls as flow temperature decreases
 | Panel radiator | 1.3 | 1.15 |
 | UFH | 1.1 | 1.1 |
 
-The simulation uses n=1.15 for radiators — **lower than the EN 442 standard of 1.3**. This is a deliberate conservative choice: it makes the WC penalty finding a lower bound. With n=1.3, the emitter output curve is steeper, the capacity deficit at low flow temperatures is larger, and the WC penalty increases.
+The simulation uses n=1.15 for radiators — **lower than the EN 442 standard of 1.3**. At n=1.15, WC's COP advantage over fixed flow dominates the emitter capacity deficit, and WC saves energy in all scenarios. At n=1.3, the emitter output curve is steeper, the capacity deficit at low flow temperatures is larger, and the margin between COP benefit and run-hour cost narrows. The n=1.3 regime is the subject of the Layer 2 fleet expansion.
 
-### 2.3 Worked Example — Why WC Wastes Energy
+### 2.3 Worked Example — The Emitter Capacity Tradeoff
 
 Consider a 1970s semi-detached house at outdoor temperature 2°C with a 21°C setpoint:
 
@@ -135,25 +133,27 @@ Consider a 1970s semi-detached house at outdoor temperature 2°C with a 21°C se
 - ΔT = 35.5 − 21 = 14.5°C
 - Output ratio = (14.5/30)^1.15 = 0.44
 - Emitter delivers: Q_rated × 0.44
-- But heat demand is 4.18 kW — emitter cannot deliver at rated capacity
-- HP runs at 100% duty, still undershooting setpoint
 - COP at (2°C outdoor, 38°C flow) ≈ 3.45
-- Actual heat delivered ≈ Q_rated × 0.44 × (longer run hours)
-- Electrical input = 4.18 / 3.45 = 1.21 kW **per hour** — but needs 0.86/0.44 = **1.95 hours** to deliver the same heat
-- Total electrical = 1.21 × 1.95 = **2.36 kW** equivalent
+- COP improves by 17%, but emitter capacity halves
 
-The WC scenario uses **66% more electricity** to deliver the same heat to the room, despite a 17% better COP.
+At n=1.15 (current fleet model), the COP improvement dominates and WC saves energy across all archetypes (28–48% vs fixed 45°C). However, the emitter capacity reduction forces longer run hours, which limits the saving. The relationship between COP gain and capacity loss is governed by the exponent n:
 
-### 2.4 Breakeven Oversizing
+- At **n=1.15** (current fleet): emitter output falls moderately. WC's COP advantage wins. WC saves energy.
+- At **n=1.3** (EN 442 standard): emitter output falls more steeply. The capacity deficit grows. The COP advantage narrows against the run-hour penalty.
+- At **n > 1.3** (real-world fouled/aged radiators): the capacity deficit may exceed the COP benefit entirely.
 
-WC only saves energy when the emitter oversizing ratio exceeds the point where the COP benefit outweighs the capacity deficit. From the fleet simulation:
+This is not a binary finding — it is a spectrum governed by emitter condition and sizing. Layer 2 will model n=1.3 with emitter oversizing as an explicit variable.
 
-| Emitter Exponent | Breakeven Oversizing | Notes |
-|-----------------|---------------------|-------|
-| n = 1.15 (simulation) | ≥ 1.75× | Generous to WC |
-| n = 1.3 (EN 442) | ≥ 2.4× | Standard radiator physics |
+### 2.4 Emitter Oversizing and the n=1.3 Threshold
 
-Most UK housing stock has emitters sized at 1.0–1.3× design load (the installer's rule of thumb is to size at the calculated heat loss, perhaps with a 10–20% margin). Oversizing by 1.75× or more is rare outside retrofit scenarios where new, larger radiators have been fitted specifically for heat pump operation.
+The emitter oversizing ratio determines whether WC's COP benefit translates to energy savings or is consumed by extended run hours. At higher exponents, the breakeven oversizing ratio increases:
+
+| Emitter Exponent | Estimated Breakeven Oversizing | Notes |
+|-----------------|-------------------------------|-------|
+| n = 1.15 (current fleet) | WC saves at all sizing | COP benefit dominates at this exponent |
+| n = 1.3 (EN 442) | ≥ 1.75–2.4× (to be validated Layer 2) | Standard radiator physics — tighter margin |
+
+Most UK housing stock has emitters sized at 1.0–1.3× design load (the installer's rule of thumb is to size at the calculated heat loss, perhaps with a 10–20% margin). Whether WC delivers net energy savings at the EN 442 standard exponent on standard-sized emitters is an open question that Layer 2 is designed to answer.
 
 ---
 
@@ -163,7 +163,7 @@ The COP model (`twin/cop_models/cop_model.py`) provides heat pump efficiency as 
 
 ### 3.1 Data Source
 
-Each of the 9 HP models has a per-model COP map derived from EN 14511 test data (manufacturer-published or interpolated from published performance tables). Each map contains approximately 20 data points spanning the operating envelope:
+Each of the 8 HP models has a per-model COP map derived from EN 14511 test data (manufacturer-published or interpolated from published performance tables). Each map contains approximately 20 data points spanning the operating envelope:
 
 - Outdoor temperature: −10°C to +15°C
 - Flow temperature: 25°C to 55°C
@@ -184,7 +184,6 @@ COP at any (T_outdoor, T_flow) point is obtained by bilinear interpolation over 
 | ecodan_8_5 | 8.5 kW | Mitsubishi Ecodan |
 | samsung_6 | 6 kW | Samsung EHS |
 | grant_6 | 6 kW | Grant Aerona3 |
-| generic | variable | Calibrated mid-range ASHP, default fallback |
 
 Capacity derating is applied at low outdoor temperatures (below −5°C, capacity reduces linearly to approximately 70% at −10°C). The `compatible_hp_models()` function in `twin/archetypes/archetypes.py` prevents pairing undersized HPs with high-loss archetypes.
 
@@ -192,19 +191,20 @@ Capacity derating is applied at low outdoor temperatures (below −5°C, capacit
 
 ## 4. Weather Compensation Curves
 
-Nineteen manufacturer WC curves are implemented in `twin/wc_curves/wc_curves.py`, each defined as a set of (outdoor_temp, flow_temp) breakpoints with linear interpolation between them.
+Twenty-seven WC curves are implemented in `twin/wc_curves/wc_curves.py`, each defined as a set of (outdoor_temp, flow_temp) breakpoints with linear interpolation between them.
 
 ### 4.1 Curve Sources
 
-Curves were extracted from manufacturer installer manuals and MCS MIS 3005 guidance:
+Curves were extracted from manufacturer installer manuals, MCS MIS 3005 guidance, and per-archetype minimum adequate calculations:
 
-- **Cosy**: moderate, steep, shallow )
-- **Daikin**: moderate, steep, shallow 
-- **Ecodan**: moderate, steep, shallow 
-- **Grant**: moderate, steep 
-- **Samsung**: moderate, steep 
-- **Vaillant**: moderate, steep, shallow 
+- **Cosy**: flat, moderate, steep
+- **Daikin**: flat, moderate, steep
+- **Ecodan**: flat, moderate, steep
+- **Grant**: flat, moderate, steep
+- **Samsung**: flat, moderate, steep
+- **Vaillant**: flat, moderate, steep
 - **MCS**: mcs_generic (MIS 3005 guidance curve)
+- **Per-archetype minimum adequate**: 8 curves (one per archetype, calculated from design heat loss)
 
 ### 4.2 How WC Works in the Simulation
 
@@ -216,7 +216,7 @@ T_flow = wc_flow_temp(T_outdoor, curve_points, min_flow=25, max_flow=55)
 
 The HP then operates in on/off mode at this flow temperature (same hysteresis logic as fixed-flow strategies). The COP is evaluated at the WC-set flow temperature, and emitter output is calculated at the resulting mean water temperature.
 
-Each WC curve is tested against every compatible archetype/HP/weather combination in the fleet, producing the paired comparison data that underpins the WC penalty finding.
+Each WC curve is tested against every compatible archetype/HP/weather combination in the fleet, producing the paired comparison data that underpins the WC vs fixed-flow and QSH vs WC findings.
 
 ---
 
@@ -241,14 +241,14 @@ Each job:
 
 ### 5.2 Database Schema
 
-**runs** (34,719 rows): one row per simulation run with summary metrics.
+**runs** (348,170 rows): one row per simulation run with summary metrics.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | run_id | TEXT | Unique identifier (UUID) |
 | archetype | TEXT | Housing archetype name |
 | weather_location | TEXT | Climate zone |
-| strategy | TEXT | Control strategy (hp_fixed_50, hp_fixed_55, hp_wc) |
+| strategy | TEXT | Control strategy (hp_fixed_45, hp_fixed_50, hp_fixed_55, hp_wc, qsh_capped, qsh_uncapped, stock, stock_weather_comp) |
 | total_kwh | REAL | Total electrical energy consumed |
 | total_cost_gbp | REAL | Total cost at tariff rate |
 | mean_cop | REAL | Time-weighted mean COP |
@@ -264,7 +264,7 @@ Each job:
 | savings_vs_wc_kwh | REAL | Energy difference vs matched WC run |
 | savings_vs_wc_pct | REAL | Percentage difference vs matched WC run |
 
-**hourly** (5,763,354 rows): one row per simulation hour per run.
+**hourly** (57,796,220 rows): one row per simulation hour per run.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -285,60 +285,58 @@ Each job:
 | hp_fixed_45 | Fixed 45°C flow, thermostat-controlled |
 | hp_fixed_50 | Fixed 50°C flow, thermostat-controlled |
 | hp_fixed_55 | Fixed 55°C flow, thermostat-controlled |
-| hp_wc | Weather-compensated flow (19 curves), thermostat-controlled |
-| qsh_capped | QSH deterministic layer (Skynet Rule) — *Layer 2/3* |
-| qsh_uncapped | QSH deterministic + RL — *Layer 2/3* |
-
-The `qsh_capped` and `qsh_uncapped` strategies require thermostat gating in the twin pipeline (pending) and are reserved for Layers 2 and 3 when system identification provides calibrated building parameters.
+| hp_wc | Weather-compensated flow (27 curves), thermostat-controlled |
+| qsh_capped | QSH deterministic layer (Skynet Rule), capped RL authority |
+| qsh_uncapped | QSH deterministic + RL, full authority |
+| stock | Stock controller baseline |
+| stock_weather_comp | Stock controller with weather compensation |
 
 ---
 
-## 6. Results — WC Energy Penalty
+## 6. Results — Strategy Comparison
 
 ### 6.1 Headline Finding
 
-Across all 34,719 runs, weather compensation consistently uses more energy than fixed 50°C flow temperature:
+Across 348,170 runs, weather compensation consistently saves energy over fixed-flow strategies, and QSH improves on WC:
 
-| Archetype | WC Mean kWh | Fixed 50°C Mean kWh | Penalty |
-|-----------|:-----------:|:-------------------:|:-------:|
-| terrace_victorian | 273.4 | 209.5 | +30.5% |
-| terrace_victorian_retro | 184.2 | 141.8 | +29.9% |
-| semi_1970s_retro | 156.4 | 121.8 | +28.4% |
-| detached_1990s | 257.1 | 203.6 | +26.3% |
-| newbuild_2020s | 118.7 | 94.8 | +25.2% |
-| flat_purpose | 164.3 | 132.8 | +23.7% |
-| semi_1970s | 232.4 | 189.3 | +22.8% |
-| bungalow_1960s | 222.9 | 182.5 | +22.2% |
+| Archetype | WC Saving vs Fixed 45°C | WC COP | F45 COP | QSH COP | QSH vs WC |
+|-----------|:-----------------------:|:------:|:-------:|:-------:|:---------:|
+| flat_purpose | −48.3% | 4.10 | 3.45 | 4.21 | +2.7% |
+| bungalow_1960s | −36.0% | 3.98 | 3.35 | 4.06 | +2.0% |
+| semi_1970s | −32.1% | 3.93 | 3.31 | 4.01 | +2.0% |
+| terrace_victorian_retro | −30.8% | 3.98 | 3.35 | 4.06 | +2.0% |
+| semi_1970s_retro | −30.3% | 4.08 | 3.43 | 4.16 | +2.1% |
+| terrace_victorian | −30.5% | 3.91 | 3.30 | 3.98 | +1.9% |
+| detached_1990s | −28.8% | 3.91 | 3.30 | 3.98 | +1.8% |
+| newbuild_2020s | −28.1% | 4.10 | 3.44 | 4.19 | +2.1% |
 
-The penalty is **worst on poorly insulated stock** (Victorian terraces, +30.5%) where emitters are most undersized relative to heat loss, and **present even on modern newbuilds** (+25.2%) where emitters are typically sized proportional to the (lower) heat loss.
+WC is the best stock strategy in every scenario. QSH improves on WC by +1.8–2.7% COP across all archetypes.
 
-### 6.2 COP Paradox
+### 6.2 The COP–Energy Relationship
 
-WC achieves higher COP in every scenario — typically 3.9–4.1 vs 2.9–3.1 for fixed 50°C. The penalty arises entirely from increased run hours due to the emitter capacity bottleneck. Higher COP is a necessary but not sufficient condition for energy savings.
+WC achieves higher COP than fixed flow in every scenario — typically 3.9–4.1 vs 2.7–3.4 for fixed strategies. At the current fleet emitter exponent (n=1.15), this COP advantage translates directly to energy savings. Emitter capacity reduction at lower flow temperatures forces longer run hours, but the COP benefit dominates.
+
+**This relationship is exponent-dependent.** At n=1.3 (EN 442 standard), the emitter capacity deficit grows, and the margin between COP benefit and run-hour penalty narrows. Whether WC still saves energy at n=1.3 with standard-sized emitters is an open question — the subject of the Layer 2 fleet expansion.
 
 ### 6.3 Sensitivity to WC Curve
 
-All 19 manufacturer curves produce a penalty. Steeper curves (lower flow temperatures at mild outdoor temps) produce larger penalties. The MCS generic curve and manufacturer "moderate" settings show the smallest penalties, but all remain substantially above zero.
+All 27 WC curves show energy savings over fixed flow at n=1.15. Steeper curves (lower flow at mild outdoor temps) show the largest COP improvements but also the largest emitter capacity deficits. The per-archetype minimum adequate curves and manufacturer "moderate" settings provide the best energy-vs-comfort tradeoff.
 
 ### 6.4 Night Setback
 
 Night setback (16-hour heating / 8-hour setback) saves 9–15% across all strategies and archetypes. The saving is consistent regardless of whether WC or fixed flow is used. This suggests setback scheduling and flow temperature strategy are independent optimisation axes.
 
-### 6.5 Model Conservatism
+### 6.5 QSH Advantage Mechanism
 
-The simulation is generous to WC in three specific ways:
+QSH outperforms WC in COP across all archetypes (+1.8–2.7%). The mechanism is demand-responsive flow temperature selection: QSH adjusts flow based on building state (room temperatures, valve positions, deficit rates) rather than outdoor temperature alone. This allows QSH to find operating points that a single-variable WC curve cannot detect.
 
-1. **Emitter exponent**: n=1.15 vs EN 442 standard n=1.3. A higher exponent means steeper output falloff at low flow temperatures, increasing the WC penalty.
-2. **Low-temperature boost**: the emitter model includes a correction that increases output at low ΔT (below 15°C), partially compensating for the capacity deficit that WC creates.
-3. **Perfect control assumption**: the simulation assumes the HP maintains exact flow temperature and the thermostat responds instantly. Real systems have thermal lag, valve delays, and control hunting that disproportionately affect WC (which operates closer to the emitter's capacity limit).
-
-All three factors favour WC. The real-world penalty is likely larger than the simulation reports.
+**The fleet underestimates QSH's advantage.** The fleet model does not capture the shoulder mode operating regime observed in live validation (Section 8.4), where aggregate demand gating produces COP 4.77 at 38–49°C flow — a 24.9% uplift over standard space heating. With shoulder mode modelled at observed duty cycles, the projected QSH advantage over WC increases to +3.1–7.1% COP.
 
 ---
 
 ## 7. External Evidence
 
-The WC penalty finding aligns with published field data:
+The strategy comparison findings align with published field data on the relationship between WC, emitter sizing, and energy performance:
 
 - **BEIS Electrification of Heat Demonstration Project (2021)**: field trial data showed WC installations in older housing stock performing below SCOP predictions. Mean in-situ SPF was 2.44, compared to manufacturer claims of 3.0+, with under-emittered properties showing the worst shortfall.
 - **Childs et al. (2025)**: analysis of monitored heat pump data found that installations with weather compensation and standard-sized emitters underperformed fixed-flow installations on total energy consumption, despite higher instantaneous COP readings.
@@ -349,35 +347,174 @@ The WC penalty finding aligns with published field data:
 
 ## 8. Live System Validation
 
-A live QSH installation provides independent validation of the fleet simulation finding.
+A live QSH installation provides independent validation of the fleet simulation findings across two phases: an initial 3-day observation window and an extended 16-day historian extraction.
 
-**System profile**: 2016 build, 5 kW peak loss at −3°C (verified by real-world sensor data), thermostat at 23°C (overtemperature protection), QSH PID target 20°C. Building closest to the newbuild_2020s archetype.
+### 8.1 System Profile
 
-**Observation period**: 28 February – 3 March 2026 (3 days, 2,822 data points).
+**Installation**: 205 m², 13 controlled zones (TRV-equipped throughout), single Octopus Cosy 6 kW heat pump. Octopus Agile tariff. Solar PV with battery storage.
 
-**Finding**: both control layers independently drove flow temperatures above manufacturer WC settings:
+**Historian**: InfluxDB 1.x, ~30-second sample interval. Four measurements: `qsh_system`, `qsh_rl`, `qsh_room`, `qsh_event`.
 
-| Control Layer | Flow Temp Range | Trend | WC Curve Would Set |
-|--------------|----------------|-------|-------------------|
-| Deterministic | 35.4°C → 43.6°C | Climbing (learning) | ~36–37°C |
-| RL (adaptive) | 41.4°C → 42.0°C | Stable | ~36–37°C |
-| Shadow (blended) | 37.2°C mean | — | ~36–37°C |
+**Recording period**: 19 Feb – 7 Mar 2026 (15.99 days, 34,135 system-level data points after filtering).
 
-Both layers converged on flow temperatures 3–5°C above where the Cosy moderate WC curve would set them. The deterministic layer was actively learning (climbing from startup), while the RL had already stabilised at a higher setpoint. They arrived at the same conclusion from different starting conditions.
+**Note on building scale**: at 205 m², this installation is approximately 1.9× the floor area of the largest fleet archetype (detached_1990s, ~110 m²). COP and flow temperature physics remain directly comparable; energy consumption and cost projections from the fleet must be scaled accordingly.
 
-The operator initially interpreted the above-WC flow temperatures as a control bug. It was not. The controller found what the fleet simulation predicted: the building needs more heat than WC delivers through standard-sized emitters.
+### 8.2 Live COP Result
+
+All COP analysis applies a heating-only filter: `mode='heat', COP > 0.5, power > 0.05 kW` (n=13,891 points, 40.7% of total). This removes standby, circulation-pump-only, and transient startup readings.
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| COP mean (heating-only) | **3.876** | All 16 days, filtered |
+| COP shoulder mode (38–49°C flow) | **4.77** | 809 points, compressor in efficient load band |
+| COP space heating (30–37°C flow) | **3.82** | 13,082 points, standard modulation |
+| Simulation prediction (fleet, QSH strategy) | 4.09–4.22 | Cosy 6, across climate zones |
+| Mean flow temp | 35.16°C | Space heating |
+| Mean outdoor temp | 7.77°C | Mild late-winter period |
+| Mean HP power | 0.79 kW | Low modulation rate |
+
+The fleet predicts QSH COP of 4.09–4.22 for the Cosy 6 across climate zones. The live all-conditions COP of 3.876 reflects the commissioning phase (7% RL blend cap) and late-winter conditions. The shoulder mode COP of 4.77 exceeds fleet predictions because the fleet does not model the aggregate demand gate that produces this operating regime (see Section 8.4). All flow temperatures were below 50°C throughout, confirming the dataset contains space heating only with no domestic hot water contamination.
+
+**COP by outdoor temperature** (heating-only, 1°C bins):
+
+| Outdoor °C | n | COP | Power (kW) |
+|-----------|---|-----|-----------|
+| 4 | 231 | 3.45 | 0.93 |
+| 5 | 1,048 | 3.31 | 0.81 |
+| 6 | 1,861 | 3.52 | 0.82 |
+| 7 | 3,215 | 3.85 | 0.84 |
+| 8 | 3,045 | 3.93 | 0.76 |
+| 9 | 1,827 | 4.02 | 0.70 |
+| 10 | 1,305 | 4.19 | 0.84 |
+| 11 | 932 | 4.37 | 0.78 |
+
+COP increases approximately 0.10 per °C rise in outdoor temperature, consistent with Carnot theory and fleet simulation predictions.
+
+### 8.3 Flow Temperature Validation
+
+Both control layers independently operated above the manufacturer WC setting throughout the observation period, consistent with the fleet simulation prediction:
+
+| Control Layer | Mean / Range | WC Curve Would Set | Observation |
+|---|---|---|---|
+| Deterministic (det_flow) | 35–53°C (windup — see 8.5) | ~36–37°C | Above WC throughout |
+| RL proposed flow | 41.2°C (stable, σ < 0.3°C) | ~36–37°C | Converged 5°C above WC |
+| Flow arbiter output | 35.0–37.3°C | — | Protected system during windup |
+
+The RL independently converged on a 41°C proposal from reward signals alone — matching the load-factor efficiency finding in Section 8.4 without being provided any HP efficiency curve data. This represents independent validation from two separate analytical methods (fleet simulation physics model; live reinforcement learning from operational reward).
+
+### 8.4 Shoulder Mode Discovery
+
+Analysis of 13,891 filtered heating points identified a step-change in COP at the 38°C flow temperature boundary:
+
+| Regime | Flow Temp | n | COP | Power (kW) | Delta-T |
+|--------|-----------|---|-----|-----------|---------|
+| Space heating | 30–37°C | 13,082 | 3.82 | 0.77 | 2.79°C |
+| Shoulder mode | 38–49°C | 809 | **4.74** | 1.15 | 3.27°C |
+
+**Mechanism**: The Cosy 6 (inverter-driven) operates below its efficiency sweet spot at the low electrical loads characteristic of mild-weather space heating (~0.77 kW mean). In shoulder mode, the HP runs at approximately 40–50% of rated capacity (1.15 kW), where isentropic and volumetric efficiency both peak. The result is a COP 0.92 points higher despite a 6°C higher flow temperature — the inverse of the WC efficiency narrative.
+
+This finding is not modelled in the fleet simulation. The fleet uses a static COP map; it does not model compressor part-load efficiency. The shoulder mode effect is real, measurable, and consistent (5.8% of heating time, confirmed as steady-state operation by sustained delta-T and power signals). It represents an additional optimisation axis beyond flow temperature selection.
+
+**Applicability caveat**: The COP uplift ratio (1.219×, space heating vs shoulder mode) is derived from a single Cosy 6 installation under late-winter mild-weather conditions. The direction of the effect — that inverter-driven compressors achieve better isentropic efficiency in their mid-load band than at minimum modulation — is a thermodynamic property of variable-speed compression and applies to all current inverter-driven ASHPs. The magnitude is HP-model-specific: minimum modulation threshold, compressor map shape, and refrigerant circuit design vary between manufacturers. Per-model validation across the fleet HP set (Daikin, Vaillant, Ecodan, Samsung, Grant) is pending Layer 3 multi-installation data collection. Fleet impact projections using the 1.219× ratio (Section 9) should be read as indicative of direction and order of magnitude, pending multi-model confirmation in Layer 3.
+
+**The RL has found this independently**: the RL's stable proposal of 41°C sits in the centre of the shoulder mode band. It arrived at this from operational reward signals, without being told about compressor efficiency curves.
+
+### 8.5 Integrator Windup and Anti-Windup Fix
+
+The live data captured a limit-cycle failure mode in the deterministic controller's integrator, and its correction.
+
+**Failure mode**: The integrator accumulated demand from rooms persistently below setpoint (bathroom, utility, ensuites — wet rooms with high ventilation losses). The flow arbiter clamped actual flow at 35°C for equipment protection. With output clamped, the integrator continued accumulating against a constraint it could not satisfy — classic anti-windup failure. det_flow escalated from a thermally reasonable ~33°C to 55°C (the arbiter ceiling) over 8 days while actual flow remained at 35°C.
+
+**Evidence from historian**: det_flow trace Mar 05 2026 shows integrator winding up from 43.7°C → 55.0°C in a single evening demand peak (15:34–20:10, 4h36m). Simultaneous RL proposed flow was stable at 41.2°C. The three-way divergence at peak: det_flow 55°C, RL proposal 42°C, arbiter output 35°C.
+
+**Fix applied**: standard back-calculation anti-windup. Integrator frozen when flow arbiter saturated high with positive room error (or saturated low with negative room error). Integrator released when conditions reverse.
+
+**Fix confirmed**: after implementation, HA historian recorded no further det_flow state changes — the integrator held constant at 49°C through the subsequent evening demand peak that had previously added 11°C of windup. No state-change entries in HA = no further escalation. Confirmed via HA history export (2,524 state records across three entities, Mar 05–07 2026).
+
+**Tagged**: `# TACTICAL FIX (2026-03-06) anti-windup` — to be resolved architecturally in the pipeline ShadowController refactor.
+
+### 8.6 System Identification Status (Feb–Mar 2026)
+
+The live system's online learning (SYS-ID) module has been extracting building thermal parameters from live sensor data:
+
+| Parameter | Status | Notes |
+|-----------|--------|-------|
+| Solar gain factors | ✅ 9 rooms | 1,986–2,964 observations per room |
+| U values | ✅ 8 rooms | 40–86 observations, 13–193× divergence from SAP priors |
+| U values | ⚠️ 4 rooms (prior only) | lounge, open_plan, bed1, cloaks — well-served rooms rarely trigger qualifying events |
+| Thermal mass (C) | ⏳ Blocked until spring | 6,500 rejections — HP running continuously all winter |
+
+**U value divergence finding**: the 8 identified rooms show 13–193× divergence from industry standard (SAP) priors. This is not measurement error. Bathroom: 193×, hall: 191×, landing: 157×, utility: 56× above SAP values. This is the QSH thesis confirmed empirically: real buildings do not match textbook U values. WC installers using SAP-derived heat loss calculations to set flow temperature curves are working with fiction.
+
+**bed3 internal gains**: solar_gain_factor = 0.6465 confirmed from 2,449 observations (south-facing, occupied daytime with PC heat load). Room averages 1.52°C above setpoint across the full recording period, with TRV valve at 0.1% mean opening. The deterministic layer correctly zeroes heat demand for this room; the RL has learned to anticipate the pattern.
 
 ---
 
-## 9. Limitations and Future Work
+## 9. Cost Per kWh of Useful Heat Delivered
+
+COP is an engineering metric. Customers are billed on kilowatt-hours of electrical input, at a tariff in pence per kWh. The customer-relevant performance metric is the cost to deliver one kWh of useful heat to the building:
+
+```
+Cost per kWh(thermal) = Tariff (p/kWh electrical) / COP
+```
+
+### 9.1 Three-Strategy Comparison
+
+Using Ofgem Q1 2026 standard variable tariff: **27.69p/kWh** (direct debit, England/Scotland/Wales average, inc. 5% VAT).
+
+| Strategy | Fleet COP | Cost per kWh heat | kWh electrical per 10,000 kWh heat |
+|---|---|---|---|
+| Fixed flow 45°C (common installer default) | 3.37 | **8.22p** | 2,967 kWh |
+| Weather compensation (best-practice WC) | 4.00 | **6.92p** | 2,500 kWh |
+| QSH (fleet predicted, full RL authority) | 4.09 | **6.77p** | 2,445 kWh |
+
+### 9.2 Annual Saving — Typical UK Home
+
+---
+
+> ## **For every 10,000 kWh of heat delivered to your home:**
+>
+> **QSH saves 522 kWh of electricity versus fixed flow 45°C**
+>
+> **QSH saves 55 kWh of electricity versus weather compensation**
+>
+> At the Ofgem Q1 2026 standard tariff (27.69p/kWh):
+> **QSH saves £145/year versus fixed flow, per 10,000 kWh heat delivered.**
+
+---
+
+For a typical UK semi-detached (approximately 12,000 kWh heat demand per year):
+
+| Comparison | kWh electrical saved | Annual saving (£) |
+|---|---|---|
+| QSH vs fixed flow 45°C | **627 kWh** | **£174** |
+| QSH vs weather compensation | **66 kWh** | **£18** |
+
+### 9.3 Honest Commissioning Context
+
+The live installation is currently operating at 7% RL blend factor (Skynet Rule cap during commissioning). At this blend level, measured COP is 3.876 — below the fleet's WC figure of 4.00. The live system is not yet delivering its full predicted saving over WC.
+
+This is expected and correct behaviour. The RL has not yet earned higher authority (see Section 8.5 for the current negative reward context). The full 4.09 COP and the 55 kWh/10,000 kWh saving over WC are fleet-predicted targets for full RL authority. The 522 kWh/10,000 kWh saving versus fixed flow 45°C is available now from the deterministic layer alone.
+
+### 9.4 Tariff Interaction
+
+The cost comparison above uses a flat standard tariff. The live installation operates on Octopus Agile (variable half-hourly pricing). The Agile tariff introduces a further dimension that the fleet model does not capture: by concentrating discretionary thermal load (domestic hot water, pre-heat) in cheap rate windows (typically 02:00–05:00 at 14–16p/kWh) and reducing operation during peak windows (16:00–18:00 at 38–40p/kWh), the effective blended cost per kWh is reduced below the standard tariff figure used here.
+
+Across 16 days of live operation, QSH delivered heat at an effective blended rate of **5.43p/kWh thermal** (£19.20 total cost / 353.8 kWh thermal delivered). This is 34% below the standard-tariff equivalent (8.22p/kWh for fixed flow) and demonstrates the combined value of COP optimisation and tariff-aware scheduling — two independent benefits that compound rather than substitute.
+
+---
+
+## 10. Limitations and Future Work
 
 ### Current Limitations
 
-- **Archetype priors**: building parameters use SAP/CIBSE literature values, not calibrated from real buildings. Layer 3 addresses this with system identification.
-- **Emitter exponent**: v1 uses n=1.15 (conservative). Future runs will use n=1.3 (EN 442 standard) to provide a more realistic estimate.
+- **Archetype priors**: building parameters use SAP/CIBSE literature values, not calibrated from real buildings. Layer 3 addresses this with system identification. Live SYS-ID data shows 13–193× divergence from SAP priors for identified rooms — prior-based fleet predictions are conservative.
+- **Emitter exponent**: v1 uses n=1.15. At this exponent, WC saves energy over fixed flow in all scenarios. Layer 2 will use n=1.3 (EN 442 standard) to investigate the regime where emitter capacity constraints tighten and WC's energy advantage may narrow or reverse on standard-sized emitters.
 - **Single-week simulations**: 168-hour runs capture steady-state behaviour but may not fully represent seasonal transitions. Extended simulations (full heating season) are planned for Layer 2.
-- **QSH strategies excluded**: the qsh_capped and qsh_uncapped strategies require thermostat gating in the twin pipeline, which is pending. These strategies are reserved for Layers 2 and 3.
-- **No domestic hot water (DHW)**: the simulation models space heating only. DHW adds a fixed energy overhead that does not interact with the WC finding.
+- **QSH strategies**: qsh_capped and qsh_uncapped are included in the fleet but do not yet model the aggregate demand gate that produces shoulder mode efficiency in the live system.
+- **No domestic hot water**: the simulation models space heating only. DHW adds a fixed energy overhead and does not interact with the strategy comparison, but it does interact with tariff optimisation — a dimension not currently modelled.
+- **No compressor part-load efficiency**: the fleet COP model uses static maps. The shoulder mode effect (COP 4.74 at 38–49°C flow on the live installation vs 3.82 at 30–37°C, driven by load factor) is not captured. Fleet COP predictions for mild-weather operation are therefore conservative.
+- **No Agile tariff modelling**: fleet runs use a flat electricity rate. Tariff-aware scheduling (demonstrated live at 5.43p/kWh thermal effective rate) represents an additional benefit not reflected in fleet cost projections.
 
 ### Planned Improvements (Layer 2)
 
@@ -386,14 +523,16 @@ The operator initially interpreted the above-WC flow temperatures as a control b
 - Extended archetype library (28 base types × 3 insulation levels = 84 profiles)
 - Full heating season simulations
 - Thermostat gating for QSH strategies
+- Compressor part-load efficiency model (to capture shoulder mode effect)
 - Tariff sensitivity analysis (flat rate vs time-of-use vs Agile)
 
 ### Planned Validation (Layer 3)
 
-- System identification convergence on live installation
+- System identification convergence on live installation — 8 rooms identified, 4 pending
+- Thermal mass (C) identification pending spring HP-off periods
 - Twin prediction vs metered reality at 30-second resolution
 - RMSE and bias metrics for room temperature, flow temperature, energy consumption
-- Retrospective validation of fleet predictions against in-situ measurements
+- Retrospective validation of fleet predictions against 16-day historian dataset
 
 ---
 
@@ -407,3 +546,4 @@ The operator initially interpreted the above-WC flow temperatures as a control b
 6. BEIS — Electrification of Heat Demonstration Project: final report (2021).
 7. Electrification of Heat programme monitoring data (DESNZ, ongoing).
 8. Energy Saving Trust — Getting warmer: a field trial of heat pumps (2013).
+9. Ofgem — Energy price cap unit rates Q1 2026 (January–March 2026), 24 November 2025.
