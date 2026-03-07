@@ -2,7 +2,7 @@
 
 **Physics-based thermal optimisation for residential heat pumps.**
 
-A digital twin fleet simulation framework that models heat pump performance across UK housing archetypes, climate zones, and control strategies. Built by a process control engineer (ISA S88/S95/S103, 28 years) who watched a heat pump controller hunt and overshoot in patterns that wouldn't survive a factory floor audit.
+A digital twin fleet simulation framework that models heat pump performance across UK housing archetypes, climate zones, and control strategies. Built by a process control engineer (ISA S88/S95/S106, 28 years) who watched a heat pump controller hunt and overshoot in patterns that wouldn't survive a factory floor audit.
 
 ---
 
