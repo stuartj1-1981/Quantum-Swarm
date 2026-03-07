@@ -2,7 +2,7 @@
 
 **Version 1.1 — March 2026**
 
-Stuart Hunt | Automation Engineer | ISA S88/S95/S103
+Stuart Hunt | Automation Engineer | ISA S88/S95/S106
 
 ---
 
